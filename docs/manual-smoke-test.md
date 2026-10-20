@@ -61,6 +61,17 @@ Use this checklist before demoing OpenSteps.
 18. Open `guide.md` or `guide.html` and verify relative image links under `images/` work.
 19. Verify exported redacted steps use the redacted image.
 
+### Single HTML Export
+
+1. Prepare a guide with reordered steps, edited titles and descriptions, a manual step without a screenshot, and cropped, redacted, annotated, or replaced screenshots.
+2. Click **Export**, clear **Markdown** and **HTML**, and select **Export as Single HTML**.
+3. Confirm the export folder contains only `guide-single.html`, with no `images` folder or other files.
+4. Copy only that HTML file to another folder. Disconnect from the network and open it directly from disk (`file://`) in both Edge and Chrome.
+5. Verify all screenshots render, their edits are preserved, and the step order, titles, descriptions, and layout match the editor.
+6. Include text such as `<script>alert(1)</script>`, `&`, and quotes in titles and descriptions. Verify it appears as text and does not execute or add HTML elements.
+7. With browser developer tools open, reload the file and verify there are no external network requests, scripts, stylesheets, or fonts.
+8. Repeat export with all three formats selected. Verify `guide.md`, `guide.html`, `guide-single.html`, and the existing `images` folder are produced; the standard HTML and Markdown still use relative image links, while the single HTML works when copied alone.
+
 ## Multi-Monitor Capture
 
 1. Connect two monitors.

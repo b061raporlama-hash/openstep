@@ -56,7 +56,11 @@ public sealed class MarkdownExporter
         var exportFolder = GetUniqueExportFolder(parentFolder, session.Title);
         Directory.CreateDirectory(exportFolder);
         var imageDirectory = Path.Combine(exportFolder, "images");
-        Directory.CreateDirectory(imageDirectory);
+        var copyImages = formats.HasFlag(GuideExportFormat.Markdown) || formats.HasFlag(GuideExportFormat.Html);
+        if (copyImages)
+        {
+            Directory.CreateDirectory(imageDirectory);
+        }
 
         var warnings = new List<string>();
         for (var i = 0; i < session.Steps.Count; i++)
@@ -76,13 +80,17 @@ public sealed class MarkdownExporter
                 continue;
             }
 
-            var destination = Path.Combine(imageDirectory, $"step-{i + 1:000}.png");
-            File.Copy(screenshotPath, destination, overwrite: false);
+            if (copyImages)
+            {
+                var destination = Path.Combine(imageDirectory, $"step-{i + 1:000}.png");
+                File.Copy(screenshotPath, destination, overwrite: false);
+            }
         }
 
         var outputPaths = new List<string>();
         var markdownPath = string.Empty;
         var htmlPath = string.Empty;
+        var singleHtmlPath = string.Empty;
 
         if (formats.HasFlag(GuideExportFormat.Markdown))
         {
@@ -95,8 +103,15 @@ public sealed class MarkdownExporter
         if (formats.HasFlag(GuideExportFormat.Html))
         {
             htmlPath = Path.Combine(exportFolder, "guide.html");
-            await File.WriteAllTextAsync(htmlPath, BuildHtml(session), cancellationToken);
+            await File.WriteAllTextAsync(htmlPath, await BuildHtmlAsync(session, false, cancellationToken), cancellationToken);
             outputPaths.Add(htmlPath);
+        }
+
+        if (formats.HasFlag(GuideExportFormat.SingleHtml))
+        {
+            singleHtmlPath = Path.Combine(exportFolder, "guide-single.html");
+            await File.WriteAllTextAsync(singleHtmlPath, await BuildHtmlAsync(session, true, cancellationToken), cancellationToken);
+            outputPaths.Add(singleHtmlPath);
         }
 
         return new ExportResult
@@ -104,6 +119,7 @@ public sealed class MarkdownExporter
             ExportFolder = exportFolder,
             MarkdownPath = markdownPath,
             HtmlPath = htmlPath,
+            SingleHtmlPath = singleHtmlPath,
             OutputPaths = outputPaths,
             Warnings = warnings
         };
@@ -119,7 +135,7 @@ public sealed class MarkdownExporter
         return step.ScreenshotPath;
     }
 
-    private static string BuildHtml(RecordingSession session)
+    private static async Task<string> BuildHtmlAsync(RecordingSession session, bool embedImages, CancellationToken cancellationToken)
     {
         var html = new StringBuilder();
         html.AppendLine("<!doctype html>");
@@ -142,6 +158,7 @@ public sealed class MarkdownExporter
 
         for (var i = 0; i < session.Steps.Count; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var step = session.Steps[i];
             var number = i + 1;
             var title = string.IsNullOrWhiteSpace(step.DisplayTitle) ? $"Step {number}" : step.DisplayTitle;
@@ -149,7 +166,15 @@ public sealed class MarkdownExporter
             var screenshotPath = GetExportScreenshotPath(step);
             if (!string.IsNullOrWhiteSpace(screenshotPath) && File.Exists(screenshotPath))
             {
-                html.AppendLine($"<p><img src=\"images/step-{number:000}.png\" alt=\"Step {number}\"></p>");
+                var imageSource = $"images/step-{number:000}.png";
+                if (embedImages)
+                {
+                    // Captures, replacements and edited screenshots are stored as PNGs.
+                    var imageBytes = await File.ReadAllBytesAsync(screenshotPath, cancellationToken);
+                    imageSource = $"data:image/png;base64,{Convert.ToBase64String(imageBytes)}";
+                }
+
+                html.AppendLine($"<p><img src=\"{imageSource}\" alt=\"Step {number}\"></p>");
             }
 
             if (!string.IsNullOrWhiteSpace(step.UserDescription))

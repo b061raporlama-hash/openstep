@@ -1,7 +1,7 @@
 <Window x:Class="OpenSteps.App.ExportOptionsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Export options" Width="540" Height="420" MinWidth="460" MinHeight="360"
+        Title="Export options" Width="540" Height="520" MinWidth="460" MinHeight="360"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
         Background="{StaticResource AppBackgroundBrush}">
@@ -18,7 +18,7 @@
                     <TextBlock Text="Export guide"
                                Style="{StaticResource DisplayText}"
                                FontSize="20" />
-                    <TextBlock Text="Choose which guide files to create. Screenshots are included alongside them in an /images folder."
+                    <TextBlock Text="Choose which guide files to create. Single HTML embeds screenshots; Markdown and standard HTML use an /images folder."
                                Style="{StaticResource SubtleText}"
                                TextWrapping="Wrap"
                                Margin="0,6,0,18" />
@@ -46,7 +46,20 @@
                             <CheckBox x:Name="HtmlCheckBox" IsChecked="True">
                                 <StackPanel>
                                     <TextBlock Text="HTML (.html)" FontWeight="SemiBold" />
-                                    <TextBlock Text="Self-contained page that opens in any browser."
+                                    <TextBlock Text="Browser page with screenshots in an accompanying /images folder."
+                                               Style="{StaticResource SubtleText}"
+                                               TextWrapping="Wrap"
+                                               FontSize="12"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+                            </CheckBox>
+                            <Rectangle Height="1"
+                                       Fill="{StaticResource BorderSoftBrush}"
+                                       Margin="0,12,0,12" />
+                            <CheckBox x:Name="SingleHtmlCheckBox">
+                                <StackPanel>
+                                    <TextBlock Text="Export as Single HTML" FontWeight="SemiBold" />
+                                    <TextBlock Text="One offline .html file with embedded screenshots. No accompanying files needed."
                                                Style="{StaticResource SubtleText}"
                                                TextWrapping="Wrap"
                                                FontSize="12"

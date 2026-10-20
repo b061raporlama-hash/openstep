@@ -25,6 +25,11 @@ public partial class ExportOptionsWindow : Window
             formats |= (int)GuideExportFormat.Html;
         }
 
+        if (SingleHtmlCheckBox.IsChecked == true)
+        {
+            formats |= (int)GuideExportFormat.SingleHtml;
+        }
+
         if (formats == 0)
         {
             System.Windows.MessageBox.Show("Choose at least one export file type.", "OpenSteps", MessageBoxButton.OK, MessageBoxImage.Information);
