@@ -63,9 +63,9 @@ public partial class SessionEditorWindow : Window
         await _controller.SaveSessionFromEditorAsync();
     }
 
-    private async void ExportMarkdown_Click(object sender, RoutedEventArgs e)
+    private async void ExportGuide_Click(object sender, RoutedEventArgs e)
     {
-        await _controller.ExportMarkdownFromEditorAsync();
+        await _controller.ExportGuideFromEditorAsync();
     }
 
     private void ViewScreenshot_Click(object sender, RoutedEventArgs e)

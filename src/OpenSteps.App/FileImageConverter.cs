@@ -17,6 +17,11 @@ public sealed class FileImageConverter : IValueConverter
         var image = new BitmapImage();
         image.BeginInit();
         image.CacheOption = BitmapCacheOption.OnLoad;
+        if (int.TryParse(parameter?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var decodeWidth)
+            && decodeWidth > 0)
+        {
+            image.DecodePixelWidth = decodeWidth;
+        }
         image.UriSource = new Uri(path, UriKind.Absolute);
         image.EndInit();
         image.Freeze();

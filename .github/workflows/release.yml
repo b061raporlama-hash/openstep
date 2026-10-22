@@ -52,7 +52,7 @@ jobs:
         run: dotnet test OpenSteps.sln --configuration Release --logger "trx;LogFileName=windows-tests.trx" --results-directory artifacts/test-results
 
       - name: Publish self-contained Windows x64 application
-        run: dotnet publish src/OpenSteps.App/OpenSteps.App.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false --output artifacts/win-x64
+        run: dotnet publish src/OpenSteps.App/OpenSteps.App.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false --output artifacts/win-x64
 
       - name: Package application
         shell: pwsh
@@ -60,9 +60,13 @@ jobs:
           Copy-Item LICENSE artifacts/win-x64/LICENSE.txt
           Copy-Item README.md artifacts/win-x64/README.md
           $name = "OpenSteps-$env:RELEASE_TAG-win-x64.zip"
+          $exe = "OpenSteps-$env:RELEASE_TAG-win-x64.exe"
+          Copy-Item artifacts/win-x64/OpenSteps.App.exe "artifacts/$exe"
           Compress-Archive -Path artifacts/win-x64/* -DestinationPath "artifacts/$name"
           $hash = (Get-FileHash "artifacts/$name" -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $name" | Set-Content "artifacts/$name.sha256" -Encoding ascii
+          $exeHash = (Get-FileHash "artifacts/$exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$exeHash  $exe" | Set-Content "artifacts/$exe.sha256" -Encoding ascii
 
       - name: Save test results
         if: always()
@@ -78,5 +82,5 @@ jobs:
           if (-not (Test-Path $notes)) {
             throw "Missing release notes: $notes"
           }
-          gh release create $env:RELEASE_TAG "artifacts/OpenSteps-$env:RELEASE_TAG-win-x64.zip" "artifacts/OpenSteps-$env:RELEASE_TAG-win-x64.zip.sha256" --verify-tag --title "OpenSteps $env:RELEASE_TAG" --notes-file $notes
+          gh release create $env:RELEASE_TAG "artifacts/OpenSteps-$env:RELEASE_TAG-win-x64.exe" "artifacts/OpenSteps-$env:RELEASE_TAG-win-x64.exe.sha256" "artifacts/OpenSteps-$env:RELEASE_TAG-win-x64.zip" "artifacts/OpenSteps-$env:RELEASE_TAG-win-x64.zip.sha256" --verify-tag --title "OpenSteps $env:RELEASE_TAG" --notes-file $notes
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

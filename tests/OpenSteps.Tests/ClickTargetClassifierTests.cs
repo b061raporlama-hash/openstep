@@ -4,6 +4,25 @@ namespace OpenSteps.Tests;
 
 public sealed class ClickTargetClassifierTests
 {
+    [Theory]
+    [InlineData("TopLevelWindowForOverflowXamlIsland")]
+    [InlineData("NotifyIconOverflowWindow")]
+    public void TrayOverflowWindow_DoesNotResolveToRecordedTarget(string rootClassName)
+    {
+        var target = ClickTargetClassifier.CreateInfo(
+            1543,
+            922,
+            new IntPtr(10),
+            new IntPtr(11),
+            rootClassName,
+            rootClassName,
+            "explorer",
+            new HashSet<IntPtr>());
+
+        Assert.Equal(ClickClassification.TaskbarOrShell, target.Classification);
+        Assert.False(new CaptureTargetResolver().Resolve(target, null).ShouldRecord);
+    }
+
     [Fact]
     public void ShellTrayWnd_ClassifiesAsTaskbarOrShell()
     {

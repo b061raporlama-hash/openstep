@@ -4,6 +4,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
 
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
@@ -18,9 +19,12 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Using Include="System.IO" />
+    <None Include="..\..\src\OpenSteps.App\App.xaml" Link="App.xaml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\OpenSteps.App\OpenSteps.App.csproj" />
     <ProjectReference Include="..\..\src\OpenSteps.Core\OpenSteps.Core.csproj" />
     <ProjectReference Include="..\..\src\OpenSteps.Capture\OpenSteps.Capture.csproj" />
   </ItemGroup>

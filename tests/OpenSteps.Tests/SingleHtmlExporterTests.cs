@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using OpenSteps.Core.Models;
 using OpenSteps.Core.Services;
 
@@ -17,7 +18,7 @@ public sealed class SingleHtmlExporterTests : IDisposable
         var session = new RecordingSession { Title = "Single HTML" };
         session.Steps.Add(new RecordedStep { UserTitle = "Capture", ScreenshotPath = image });
 
-        var result = await new MarkdownExporter().ExportAsync(session, _temp, GuideExportFormat.SingleHtml);
+        var result = await ExportDirectAsync(session);
         var html = await File.ReadAllTextAsync(result.SingleHtmlPath);
 
         Assert.Equal(result.SingleHtmlPath, Assert.Single(result.OutputPaths));
@@ -38,9 +39,10 @@ public sealed class SingleHtmlExporterTests : IDisposable
         Assert.Equal(Convert.FromBase64String(OriginalPng), Assert.Single(ReadEmbeddedImages(portableHtml)));
         Assert.DoesNotContain("images/", portableHtml);
         Assert.DoesNotContain(image, portableHtml);
-        Assert.DoesNotMatch("(?i)<(?:script|link|iframe|object|embed)\\b|@import|url\\(", portableHtml);
-        var references = Regex.Matches(portableHtml, "(?:src|href)=[\"']([^\"']+)[\"']");
-        Assert.StartsWith("data:image/png;base64,", Assert.Single(references.Cast<Match>()).Groups[1].Value);
+        Assert.DoesNotMatch("(?i)<(?:link|iframe|object|embed)\\b|<script[^>]+src=|@import|url\\(", portableHtml);
+        Assert.Contains("connect-src 'none'", portableHtml);
+        Assert.DoesNotContain("adguard", portableHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotMatch("(?:src|href)=[\"'][^\"']+[\"']", portableHtml);
     }
 
     [Theory]
@@ -59,7 +61,7 @@ public sealed class SingleHtmlExporterTests : IDisposable
             EditedScreenshotPath = useEditedPath ? final : null
         });
 
-        var result = await new MarkdownExporter().ExportAsync(session, _temp, GuideExportFormat.SingleHtml);
+        var result = await ExportDirectAsync(session);
         var html = await File.ReadAllTextAsync(result.SingleHtmlPath);
 
         Assert.Equal(await File.ReadAllBytesAsync(final), Assert.Single(ReadEmbeddedImages(html)));
@@ -72,32 +74,34 @@ public sealed class SingleHtmlExporterTests : IDisposable
     {
         var firstImage = await WriteImageAsync("first.png", OriginalPng);
         var secondImage = await WriteImageAsync("second.png", EditedPng);
-        var session = new RecordingSession { Title = "Guide & <b>title</b>" };
+        var session = new RecordingSession { Title = "Türkçe {{STEP_DATA}} & <b>başlık</b>" };
         session.Steps.Add(new RecordedStep { Index = 1, UserTitle = "Second", ScreenshotPath = secondImage });
         session.Steps.Add(new RecordedStep
         {
             Index = 2,
             GeneratedTitle = "Generated",
             UserTitle = "First <img src=x onerror=alert(1)>",
-            UserDescription = "</p><script>alert(1)</script> & \"quoted\"\nNext line",
+            UserDescription = "</script><script>alert(1)</script> & \"quoted\"\nİkinci satır: ığüşöç",
             ScreenshotPath = firstImage
         });
         session.Steps.Reverse();
 
-        var result = await new MarkdownExporter().ExportAsync(session, _temp, GuideExportFormat.SingleHtml);
+        var result = await ExportDirectAsync(session);
         var html = await File.ReadAllTextAsync(result.SingleHtmlPath);
         var embeddedImages = ReadEmbeddedImages(html);
 
-        Assert.Contains("<title>Guide &amp; &lt;b&gt;title&lt;/b&gt;</title>", html);
-        Assert.Contains("<h1>Guide &amp; &lt;b&gt;title&lt;/b&gt;</h1>", html);
-        Assert.Contains("<h2>Step 1: First &lt;img src=x onerror=alert(1)&gt;</h2>", html);
-        Assert.Contains("<p>&lt;/p&gt;&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;quoted&quot;", html);
-        var description = Regex.Match(html, "<p>(&lt;/p&gt;.*?)</p>", RegexOptions.Singleline).Groups[1].Value;
-        Assert.Equal(session.Steps[0].UserDescription, System.Net.WebUtility.HtmlDecode(description));
-        Assert.DoesNotContain("<script>", html);
+        var title = Regex.Match(html, "<title>(.*?)</title>").Groups[1].Value;
+        Assert.Equal(session.Title, System.Net.WebUtility.HtmlDecode(title));
+        var steps = ReadSteps(html);
+        Assert.Equal(1, steps[0].GetProperty("number").GetInt32());
+        Assert.Equal(2, steps[1].GetProperty("number").GetInt32());
+        Assert.Equal(session.Steps[0].DisplayTitle + "\n" + session.Steps[0].UserDescription, steps[0].GetProperty("description").GetString());
+        Assert.Equal("Second", steps[1].GetProperty("description").GetString());
+        Assert.Equal(2, Regex.Matches(html, "<script\\b").Count);
+        Assert.DoesNotContain("</script><script>alert(1)", html);
         Assert.DoesNotContain("<img src=x", html);
         Assert.DoesNotContain("Generated", html);
-        Assert.True(html.IndexOf("<h2>Step 1:", StringComparison.Ordinal) < html.IndexOf("<h2>Step 2: Second", StringComparison.Ordinal));
+        Assert.Contains("$('description').textContent", html);
         Assert.Equal(2, embeddedImages.Count);
         Assert.Equal(await File.ReadAllBytesAsync(firstImage), embeddedImages[0]);
         Assert.Equal(await File.ReadAllBytesAsync(secondImage), embeddedImages[1]);
@@ -110,14 +114,17 @@ public sealed class SingleHtmlExporterTests : IDisposable
         session.Steps.Add(new RecordedStep { ActionType = StepActionType.Manual, UserTitle = "Manual", UserDescription = "Instructions" });
         session.Steps.Add(new RecordedStep { UserTitle = "Missing", ScreenshotPath = Path.Combine(_temp, "missing.png") });
 
-        var result = await new MarkdownExporter().ExportAsync(session, _temp, GuideExportFormat.SingleHtml);
+        var result = await ExportDirectAsync(session);
         var html = await File.ReadAllTextAsync(result.SingleHtmlPath);
 
         Assert.Equal("Step 2 screenshot was missing and was skipped.", Assert.Single(result.Warnings));
-        Assert.Contains("<h2>Step 1: Manual</h2>", html);
-        Assert.Contains("<p>Instructions</p>", html);
-        Assert.Contains("<h2>Step 2: Missing</h2>", html);
-        Assert.DoesNotContain("<img", html);
+        var steps = ReadSteps(html);
+        Assert.Equal(2, steps.GetArrayLength());
+        Assert.Equal("Manual\nInstructions", steps[0].GetProperty("description").GetString());
+        Assert.Equal("Missing", steps[1].GetProperty("description").GetString());
+        Assert.All(steps.EnumerateArray(), step => Assert.Equal(JsonValueKind.Null, step.GetProperty("src").ValueKind));
+        Assert.Empty(ReadEmbeddedImages(html));
+        Assert.Contains("Bu adımda ekran görüntüsü yok", html);
         Assert.Equal(result.SingleHtmlPath, Assert.Single(Directory.GetFileSystemEntries(result.ExportFolder)));
     }
 
@@ -128,13 +135,14 @@ public sealed class SingleHtmlExporterTests : IDisposable
         var session = new RecordingSession { Title = "Missing edit" };
         session.Steps.Add(new RecordedStep { ScreenshotPath = image, EditedScreenshotPath = Path.Combine(_temp, "missing.png") });
 
-        var result = await new MarkdownExporter().ExportAsync(session, _temp, GuideExportFormat.SingleHtml);
+        var result = await ExportDirectAsync(session);
 
         Assert.Equal(await File.ReadAllBytesAsync(image), Assert.Single(ReadEmbeddedImages(await File.ReadAllTextAsync(result.SingleHtmlPath))));
         Assert.Empty(result.Warnings);
     }
 
     [Theory]
+    [InlineData(GuideExportFormat.SingleHtml)]
     [InlineData(GuideExportFormat.Markdown)]
     [InlineData(GuideExportFormat.Html)]
     [InlineData(GuideExportFormat.Markdown | GuideExportFormat.Html)]
@@ -150,7 +158,14 @@ public sealed class SingleHtmlExporterTests : IDisposable
 
         var result = await new MarkdownExporter().ExportAsync(session, _temp, formats);
         var outputCount = 0;
-        Assert.Equal(await File.ReadAllBytesAsync(edited), await File.ReadAllBytesAsync(Path.Combine(result.ExportFolder, "images", "step-001.png")));
+        if (formats.HasFlag(GuideExportFormat.Markdown) || formats.HasFlag(GuideExportFormat.Html))
+        {
+            Assert.Equal(await File.ReadAllBytesAsync(edited), await File.ReadAllBytesAsync(Path.Combine(result.ExportFolder, "images", "step-001.png")));
+        }
+        else
+        {
+            Assert.False(Directory.Exists(Path.Combine(result.ExportFolder, "images")));
+        }
         if (formats.HasFlag(GuideExportFormat.Markdown))
         {
             outputCount++;
@@ -185,6 +200,38 @@ public sealed class SingleHtmlExporterTests : IDisposable
         Assert.All(result.OutputPaths, path => Assert.True(File.Exists(path)));
     }
 
+    [Fact]
+    public async Task SingleHtml_EmptySessionHasAnEmptyStateAndNoImageFiles()
+    {
+        var result = await ExportDirectAsync(new RecordingSession());
+        var html = await File.ReadAllTextAsync(result.SingleHtmlPath);
+
+        Assert.Empty(ReadSteps(html).EnumerateArray());
+        Assert.Contains("Bu kayıtta adım bulunmuyor.", html);
+        Assert.Empty(result.Warnings);
+        Assert.Equal(result.SingleHtmlPath, Assert.Single(Directory.GetFileSystemEntries(result.ExportFolder)));
+    }
+
+    [Fact]
+    public async Task SingleHtml_CancelledExportDoesNotCreateAFile()
+    {
+        Directory.CreateDirectory(_temp);
+        var output = Path.Combine(_temp, "cancelled.html");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new SingleHtmlExporter().ExportAsync(new RecordingSession(), output, cancellation.Token));
+
+        Assert.False(File.Exists(output));
+    }
+
+    private Task<ExportResult> ExportDirectAsync(RecordingSession session)
+    {
+        var outputDirectory = Path.Combine(_temp, "export");
+        Directory.CreateDirectory(outputDirectory);
+        return new SingleHtmlExporter().ExportAsync(session, Path.Combine(outputDirectory, "guide.html"));
+    }
+
     private async Task<string> WriteImageAsync(string filename, string base64)
     {
         var source = Path.Combine(_temp, "source");
@@ -196,10 +243,17 @@ public sealed class SingleHtmlExporterTests : IDisposable
 
     private static List<byte[]> ReadEmbeddedImages(string html)
     {
-        return Regex.Matches(html, "<img src=\"data:image/png;base64,([^\"]+)\"")
-            .Cast<Match>()
-            .Select(match => Convert.FromBase64String(match.Groups[1].Value))
+        return ReadSteps(html).EnumerateArray()
+            .Where(step => step.GetProperty("src").ValueKind == JsonValueKind.String)
+            .Select(step => Convert.FromBase64String(step.GetProperty("src").GetString()!.Split(',', 2)[1]))
             .ToList();
+    }
+
+    private static JsonElement ReadSteps(string html)
+    {
+        var json = Regex.Match(html, "<script type=\"application/json\" id=\"step-data\">(.*?)</script>", RegexOptions.Singleline).Groups[1].Value;
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
     }
 
     public void Dispose()

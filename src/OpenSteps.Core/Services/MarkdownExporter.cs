@@ -103,14 +103,21 @@ public sealed class MarkdownExporter
         if (formats.HasFlag(GuideExportFormat.Html))
         {
             htmlPath = Path.Combine(exportFolder, "guide.html");
-            await File.WriteAllTextAsync(htmlPath, await BuildHtmlAsync(session, false, cancellationToken), cancellationToken);
+            await File.WriteAllTextAsync(htmlPath, BuildHtml(session, cancellationToken), cancellationToken);
             outputPaths.Add(htmlPath);
         }
 
         if (formats.HasFlag(GuideExportFormat.SingleHtml))
         {
             singleHtmlPath = Path.Combine(exportFolder, "guide-single.html");
-            await File.WriteAllTextAsync(singleHtmlPath, await BuildHtmlAsync(session, true, cancellationToken), cancellationToken);
+            var result = await new SingleHtmlExporter().ExportAsync(session, singleHtmlPath, cancellationToken);
+            foreach (var warning in result.Warnings)
+            {
+                if (!warnings.Contains(warning))
+                {
+                    warnings.Add(warning);
+                }
+            }
             outputPaths.Add(singleHtmlPath);
         }
 
@@ -135,7 +142,7 @@ public sealed class MarkdownExporter
         return step.ScreenshotPath;
     }
 
-    private static async Task<string> BuildHtmlAsync(RecordingSession session, bool embedImages, CancellationToken cancellationToken)
+    private static string BuildHtml(RecordingSession session, CancellationToken cancellationToken)
     {
         var html = new StringBuilder();
         html.AppendLine("<!doctype html>");
@@ -167,13 +174,6 @@ public sealed class MarkdownExporter
             if (!string.IsNullOrWhiteSpace(screenshotPath) && File.Exists(screenshotPath))
             {
                 var imageSource = $"images/step-{number:000}.png";
-                if (embedImages)
-                {
-                    // Captures, replacements and edited screenshots are stored as PNGs.
-                    var imageBytes = await File.ReadAllBytesAsync(screenshotPath, cancellationToken);
-                    imageSource = $"data:image/png;base64,{Convert.ToBase64String(imageBytes)}";
-                }
-
                 html.AppendLine($"<p><img src=\"{imageSource}\" alt=\"Step {number}\"></p>");
             }
 

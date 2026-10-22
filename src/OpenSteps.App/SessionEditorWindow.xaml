@@ -77,7 +77,7 @@
                             Style="{StaticResource IconButton}"
                             Width="36" Height="36"
                             Margin="6,0,0,0" />
-                    <Button Click="ExportMarkdown_Click"
+                    <Button Click="ExportGuide_Click"
                             Margin="14,0,0,0"
                             Padding="16,0"
                             Height="36"
@@ -260,7 +260,7 @@
                                                     HorizontalAlignment="Left"
                                                     VerticalAlignment="Top">
                                                 <Grid>
-                                                    <Image Source="{Binding EffectiveScreenshotPath, Converter={StaticResource FileImageConverter}}"
+                                                    <Image Source="{Binding EffectiveScreenshotPath, Converter={StaticResource FileImageConverter}, ConverterParameter=640}"
                                                            Stretch="Uniform" />
 
                                                     <!--  Redacted badge  -->

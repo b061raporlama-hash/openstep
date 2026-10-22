@@ -31,7 +31,10 @@ public sealed class UiAutomationService
 
             var rawElement = Snapshot(element);
             var parentChain = BuildParentChain(element);
-            var candidates = CollectCandidates(element, x, y);
+            var rawElementIsUseful = IsUseful(rawElement) && Contains(rawElement.Bounds, x, y);
+            IReadOnlyList<ElementSnapshot> candidates = rawElementIsUseful
+                ? []
+                : CollectCandidates(element, x, y);
             var chosen = ChooseElement(rawElement, candidates, x, y);
             var quality = IsUseful(chosen)
                 ? UiAutomationQuality.UsefulElementFound
@@ -48,7 +51,7 @@ public sealed class UiAutomationService
                 quality == UiAutomationQuality.UsefulElementFound,
                 FormatElement(rawElement),
                 FormatParentChain(parentChain),
-                FormatCandidates(candidates, x, y),
+                rawElementIsUseful ? "(raw element already useful; descendant search skipped)" : FormatCandidates(candidates, x, y),
                 IsEditable(chosen),
                 chosen.IsPassword,
                 chosen.IsKeyboardFocusable);
@@ -119,10 +122,11 @@ public sealed class UiAutomationService
         var walker = TreeWalker.RawViewWalker;
         const int maxDepth = 4;
         const int maxElements = 80;
+        var visitedElements = 0;
 
         void Visit(AutomationElement element, int depth)
         {
-            if (depth > maxDepth || candidates.Count >= maxElements)
+            if (depth > maxDepth || visitedElements >= maxElements)
             {
                 return;
             }
@@ -137,8 +141,9 @@ public sealed class UiAutomationService
                 return;
             }
 
-            while (child is not null && candidates.Count < maxElements)
+            while (child is not null && visitedElements < maxElements)
             {
+                visitedElements++;
                 var snapshot = Snapshot(child, x, y, depth);
                 if (snapshot.ContainsClick || IsUseful(snapshot))
                 {

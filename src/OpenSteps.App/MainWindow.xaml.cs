@@ -29,11 +29,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly DpiAwarenessService _dpiAwarenessService = new();
     private readonly ScreenshotRedactionService _redactionService = new();
     private readonly StepTitleGenerator _titleGenerator = new();
-    private readonly MarkdownExporter _markdownExporter = new();
+    private readonly SingleHtmlExporter _singleHtmlExporter = new();
     private readonly SessionStore _sessionStore = new();
     private readonly SettingsService _settingsService = new();
     private readonly SemaphoreSlim _captureLock = new(1, 1);
     private readonly SemaphoreSlim _saveLock = new(1, 1);
+    private readonly SemaphoreSlim _screenshotLock = new(1, 1);
+    private readonly RecordingWorkTracker _recordingWork = new();
+    private RecordingIslandWindow? _recordingIsland;
     private readonly DispatcherTimer _typingTimer;
     private readonly DispatcherTimer _recordingStatusTimer;
 
@@ -65,9 +68,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             await LoadSettingsAsync();
         };
         _typingTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(850) };
-        _typingTimer.Tick += async (_, _) => await FinalizePendingTypingAsync();
+        _typingTimer.Tick += async (_, _) => await _recordingWork.TrackAsync(FinalizePendingTypingAsync);
         _recordingStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _recordingStatusTimer.Tick += (_, _) => RefreshRecordingStatus();
+        _recordingStatusTimer.Tick += (_, _) =>
+        {
+            RefreshRecordingStatus();
+            _recordingIsland?.EnsureTopmost();
+        };
         ResetSession();
         Closing += MainWindow_Closing;
         RefreshRecordingStatus();
@@ -184,6 +191,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private async Task StartRecordingAsync()
     {
+        if (_isRecording || _recordingWork.IsStopping)
+        {
+            return;
+        }
+
         await LoadSettingsAsync();
         EnsureSession();
         StopHooks();
@@ -206,11 +218,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             ShowRecordingTray();
             Hide();
+            _recordingIsland = new RecordingIslandWindow(StopRecordingAsync);
+            _recordingIsland.UpdateStatus(Steps.Count, _isPaused);
+            _recordingIsland.Show();
         }
         catch (Exception ex)
         {
             _isRecording = false;
             _isPaused = false;
+            StopHooks();
+            _recordingStatusTimer.Stop();
+            CloseRecordingIsland();
             RefreshRecordingStatus();
             HideRecordingTray();
             Show();
@@ -223,7 +241,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private bool ShouldIgnoreClick(int x, int y)
     {
-        return false;
+        var hit = NativeMethodsForApp.WindowFromPoint(new NativeMethodsForApp.NativePoint { X = x, Y = y });
+        return NativeMethodsForApp.IsCurrentProcessWindow(hit);
     }
 
     private void MouseHook_ClickCaptured(object? sender, ClickCapturedEventArgs e)
@@ -233,7 +252,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        Dispatcher.BeginInvoke(async () => await HandleCapturedClickAsync(e.X, e.Y, e.ActionType, e.MouseButton, e.ClickCount, e.DoubleClickDetectionReason));
+        Dispatcher.BeginInvoke(async () => await _recordingWork.TrackAsync(() => HandleCapturedClickAsync(e.X, e.Y, e.ActionType, e.MouseButton, e.ClickCount, e.DoubleClickDetectionReason)));
     }
 
     private void KeyboardHook_KeyboardInputCaptured(object? sender, KeyboardInputEventArgs e)
@@ -243,7 +262,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        Dispatcher.BeginInvoke(async () => await HandleKeyboardInputAsync(e));
+        Dispatcher.BeginInvoke(async () => await _recordingWork.TrackAsync(() => HandleKeyboardInputAsync(e)));
     }
 
     private async Task HandleCapturedClickAsync(
@@ -254,6 +273,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         int clickCount,
         string? doubleClickDetectionReason)
     {
+        if ((!_isRecording && !_recordingWork.IsStopping) || _isPaused)
+        {
+            return;
+        }
+
         var openStepsHandles = GetOpenStepsWindowHandles();
         var immediateTarget = _clickTargetClassifier.ClassifyPoint(x, y, openStepsHandles);
 
@@ -263,7 +287,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         await Task.Delay(ActivationSettleDelayMs);
-        if (!_isRecording || _isPaused)
+        if (_isPaused)
         {
             return;
         }
@@ -327,7 +351,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             try
             {
-                var element = _uiAutomationService.GetElementAt(x, y);
+                var element = await Task.Run(() => _uiAutomationService.GetElementAt(x, y));
                 step.UiAutomationSucceeded = element.Quality != UiAutomationQuality.UiAutomationFailed;
                 step.UiAutomationQuality = element.Quality;
                 step.UsefulElementFound = element.UsefulElementFound;
@@ -359,7 +383,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             try
             {
-                var screenshot = await _screenshotService.CaptureAsync(GetSessionImagesDirectory(), step.Index, x, y, ScreenshotMode, resolution?.TargetHwnd ?? IntPtr.Zero);
+                var screenshot = await CaptureWithoutIslandAsync(() => _screenshotService.CaptureAsync(GetSessionImagesDirectory(), step.Index, x, y, ScreenshotMode, resolution?.TargetHwnd ?? IntPtr.Zero));
                 ApplyScreenshotResult(step, screenshot);
                 step.ScreenshotCaptured = true;
             }
@@ -369,10 +393,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 step.CaptureError = AppendError(step.CaptureError, $"Screenshot failed: {ex.Message}");
             }
 
-            Steps.Add(step);
-            RenumberSteps();
-            RefreshRecordingStatus();
-            UpdateSessionSummary();
+            AppendRecordedStep(step);
         }
         finally
         {
@@ -382,7 +403,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private async Task HandleKeyboardInputAsync(KeyboardInputEventArgs input)
     {
-        if (!_isRecording || _isPaused || ShouldIgnoreKeyboard())
+        if ((!_isRecording && !_recordingWork.IsStopping) || _isPaused || ShouldIgnoreKeyboard())
         {
             return;
         }
@@ -396,10 +417,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         await FinalizePendingTypingAsync();
         var actionType = input.Kind == KeyboardInputKind.Shortcut ? StepActionType.Shortcut : StepActionType.SpecialKey;
         var step = CreateKeyboardActionStep(actionType, input.KeyName, input.ShortcutName);
-        Steps.Add(step);
-        RenumberSteps();
-        RefreshRecordingStatus();
-        UpdateSessionSummary();
+        AppendRecordedStep(step);
         await RefreshKeyboardActionScreenshotAsync(step);
     }
 
@@ -438,9 +456,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         var step = CreateKeyboardActionStep(StepActionType.TextEntry, null, null);
-        Steps.Add(step);
-        RenumberSteps();
-        RefreshRecordingStatus();
+        AppendRecordedStep(step);
         return step;
     }
 
@@ -556,7 +572,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         try
         {
-            var screenshot = await _screenshotService.CaptureAsync(GetSessionImagesDirectory(), $"step-{step.Index:000}-{suffix}.png", captureX, captureY, ScreenshotMode, drawHighlight);
+            var screenshot = await CaptureWithoutIslandAsync(() => _screenshotService.CaptureAsync(GetSessionImagesDirectory(), $"step-{step.Index:000}-{suffix}.png", captureX, captureY, ScreenshotMode, drawHighlight));
             ApplyScreenshotResult(step, screenshot);
             step.ScreenshotCaptured = true;
         }
@@ -582,37 +598,68 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private async Task StopRecordingAsync()
     {
-        _isRecording = false;
-        _isPaused = false;
-        await FinalizePendingTypingAsync();
-        _recordingStatusTimer.Stop();
-        StopHooks();
-        HideRecordingTray();
-        await RemoveTrailingStopNoiseStepAsync();
-
-        ShowSessionEditor();
-        await SaveSessionAsync(showMessage: false);
-    }
-
-    internal async Task ExportMarkdownFromEditorAsync()
-    {
-        var options = new ExportOptionsWindow
-        {
-            Owner = _editorWindow
-        };
-
-        if (options.ShowDialog() != true)
+        if (!_isRecording || !_recordingWork.TryBeginStop())
         {
             return;
         }
 
-        using var dialog = new WinForms.FolderBrowserDialog
+        var wasCapturingExistingStep = _screenshotCaptureTargetStep is not null;
+        // Stop flushes the hook's pending single click before accepting no more input.
+        StopHooks();
+        _isRecording = false;
+        _isPaused = false;
+        _typingTimer.Stop();
+        _recordingStatusTimer.Stop();
+        HideRecordingTray();
+        _recordingIsland?.Hide();
+        try
         {
-            Description = "Choose where to create the exported guide folder",
-            UseDescriptionForTitle = true
-        };
+            // Let already accepted hook callbacks register their asynchronous work.
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background);
+            await _recordingWork.DrainAsync();
+            await FinalizePendingTypingAsync();
+            await RemoveTrailingStopNoiseStepAsync();
+            await SaveSessionAsync(showMessage: false);
+            CloseRecordingIsland();
+            RefreshRecordingStatus();
+            if (wasCapturingExistingStep)
+            {
+                _screenshotCaptureTargetStep = null;
+                ShowSessionEditor();
+                return;
+            }
 
-        if (dialog.ShowDialog() != WinForms.DialogResult.OK)
+            Show();
+            Activate();
+            await ExportGuideAsync(this);
+        }
+        catch (Exception ex)
+        {
+            Show();
+            WinForms.MessageBox.Show($"Recording could not be exported:\n{ex.Message}", "OpenSteps", WinForms.MessageBoxButtons.OK, WinForms.MessageBoxIcon.Error);
+        }
+        finally
+        {
+            CloseRecordingIsland();
+            RefreshRecordingStatus();
+            _recordingWork.CompleteStop();
+        }
+    }
+
+    internal Task ExportGuideFromEditorAsync() => ExportGuideAsync(_editorWindow ?? (Window)this);
+
+    private async Task ExportGuideAsync(Window owner)
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export guide",
+            Filter = "HTML file (*.html)|*.html",
+            DefaultExt = ".html",
+            AddExtension = true,
+            OverwritePrompt = true,
+            FileName = new MarkdownExporter().ToSafeFolderName(GetCurrentSessionTitle()) + ".html"
+        };
+        if (dialog.ShowDialog(owner) != true)
         {
             return;
         }
@@ -622,15 +669,42 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             SyncSessionOrder();
             _session.Title = GetCurrentSessionTitle();
             await SaveSessionAsync(showMessage: false);
-            var result = await _markdownExporter.ExportAsync(_session, dialog.SelectedPath, options.SelectedFormats);
-            new ExportResultWindow(result)
-            {
-                Owner = _editorWindow
-            }.ShowDialog();
+            var result = await _singleHtmlExporter.ExportAsync(_session, dialog.FileName);
+            new ExportResultWindow(result) { Owner = owner }.ShowDialog();
         }
         catch (Exception ex)
         {
             WinForms.MessageBox.Show($"Export failed:\n{ex.Message}", "OpenSteps", WinForms.MessageBoxButtons.OK, WinForms.MessageBoxIcon.Error);
+        }
+    }
+
+    private void CloseRecordingIsland()
+    {
+        _recordingIsland?.Close();
+        _recordingIsland = null;
+    }
+
+    private async Task<ScreenshotCaptureResult> CaptureWithoutIslandAsync(Func<Task<ScreenshotCaptureResult>> capture)
+    {
+        await _screenshotLock.WaitAsync();
+        var island = _recordingIsland;
+        var restore = island is { IsVisible: true, IsExcludedFromCapture: false };
+        try
+        {
+            if (restore)
+            {
+                island!.Hide();
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            }
+            return await capture();
+        }
+        finally
+        {
+            if (restore && _isRecording && ReferenceEquals(island, _recordingIsland))
+            {
+                island!.Show();
+            }
+            _screenshotLock.Release();
         }
     }
 
@@ -1035,6 +1109,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _recordingStatusTimer.Stop();
             StopHooks();
             HideRecordingTray();
+            CloseRecordingIsland();
 
             step.ClickX = x;
             step.ClickY = y;
@@ -1052,7 +1127,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
             try
             {
-                var element = _uiAutomationService.GetElementAt(x, y);
+                var element = await Task.Run(() => _uiAutomationService.GetElementAt(x, y));
                 step.UiAutomationSucceeded = element.Quality != UiAutomationQuality.UiAutomationFailed;
                 step.UiAutomationQuality = element.Quality;
                 step.UsefulElementFound = element.UsefulElementFound;
@@ -1085,7 +1160,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 step.UserTitle = title.Title;
             }
 
-            var screenshot = await _screenshotService.CaptureAsync(GetSessionImagesDirectory(), $"step-{step.Index:000}-manual.png", x, y, ScreenshotMode, resolution.TargetHwnd);
+            var screenshot = await CaptureWithoutIslandAsync(() => _screenshotService.CaptureAsync(GetSessionImagesDirectory(), $"step-{step.Index:000}-manual.png", x, y, ScreenshotMode, resolution.TargetHwnd));
             ApplyScreenshotResult(step, screenshot);
             step.ScreenshotCaptured = true;
             SyncSessionOrder();
@@ -1129,6 +1204,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private async void MainWindow_Closing(object? sender, CancelEventArgs e)
     {
+        _isRecording = false;
+        _recordingStatusTimer.Stop();
+        _typingTimer.Stop();
+        CloseRecordingIsland();
         StopHooks();
         if (_trayIcon is not null)
         {
@@ -1247,18 +1326,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void RefreshStepViews()
     {
-        _editorWindow?.RefreshSteps();
+        if (_editorWindow is { IsVisible: true })
+        {
+            _editorWindow.RefreshSteps();
+        }
+    }
+
+    private void AppendRecordedStep(RecordedStep step)
+    {
+        step.Index = Steps.Count + 1;
+        Steps.Add(step);
+        _session.Steps.Add(step);
+        RefreshRecordingStatus();
+        UpdateSessionSummary();
     }
 
     private void RenumberSteps()
     {
-        for (var i = 0; i < Steps.Count; i++)
-        {
-            Steps[i].Index = i + 1;
-        }
-
         SyncSessionOrder();
-        RefreshStepViews();
         RefreshRecordingStatus();
     }
 
@@ -1319,11 +1404,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void UpdateSessionSummary()
     {
         _editorWindow?.SetSummary($"{Steps.Count} captured step{(Steps.Count == 1 ? string.Empty : "s")} - Local session folder: {_session.OutputDirectory}");
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Steps)));
     }
 
     private void RefreshRecordingStatus()
     {
+        _recordingIsland?.UpdateStatus(Steps.Count, _isPaused);
         if (StartRecordingButton is null)
         {
             return;
@@ -1405,7 +1490,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         try
         {
-            _trayIcon.ShowBalloonTip(2200, "OpenSteps is recording", "Right-click the tray icon, or double-click it, to stop.", WinForms.ToolTipIcon.None);
+            _trayIcon.ShowBalloonTip(2200, "OpenSteps is recording", "Use the top recording island to stop and save HTML. Tray controls are also available.", WinForms.ToolTipIcon.None);
         }
         catch
         {
@@ -1473,6 +1558,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         Dispatcher.Invoke(() =>
         {
+            if (_isRecording)
+            {
+                _recordingIsland?.Show();
+                return;
+            }
             Show();
             if (WindowState == WindowState.Minimized)
             {
@@ -1628,19 +1718,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private bool ShouldIgnoreKeyboard()
     {
-        var foreground = NativeMethodsForApp.GetForegroundWindow();
-        if (foreground == IntPtr.Zero)
-        {
-            return false;
-        }
-
-        var mainHandle = new WindowInteropHelper(this).Handle;
-        if (foreground == mainHandle)
-        {
-            return true;
-        }
-
-        return false;
+        return NativeMethodsForApp.IsCurrentProcessWindow(NativeMethodsForApp.GetForegroundWindow());
     }
     private static ScreenBounds GetVirtualScreenBounds()
     {

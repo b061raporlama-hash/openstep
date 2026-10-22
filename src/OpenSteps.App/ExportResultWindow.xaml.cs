@@ -34,7 +34,7 @@ public partial class ExportResultWindow : Window
 
     private void CopyPath_Click(object sender, RoutedEventArgs e)
     {
-        System.Windows.Clipboard.SetText(_result.ExportFolder);
+        System.Windows.Clipboard.SetText(_result.SingleHtmlPath);
     }
 
     private void Close_Click(object sender, RoutedEventArgs e)

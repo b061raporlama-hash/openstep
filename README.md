@@ -5,7 +5,7 @@
 
 <p align="center"><strong>A Windows-native recorder for turning desktop workflows into clean step-by-step guides.</strong></p>
 
-OpenSteps records what you do on Windows, captures screenshots and click context, then turns the result into an editable guide you can export as Markdown or HTML. It is built for support docs, onboarding notes, internal SOPs, QA repro steps, and tutorials where you want a local tool instead of a cloud recorder.
+OpenSteps records what you do on Windows, captures screenshots and click context, then turns the result into an editable guide you can export as a single interactive HTML file. It is built for support docs, onboarding notes, internal SOPs, QA repro steps, and tutorials where you want a local tool instead of a cloud recorder.
 
 <p align="center">
   <img src="img/initial.png" alt="OpenSteps before recording" width="720" />
@@ -30,7 +30,7 @@ OpenSteps records what you do on Windows, captures screenshots and click context
 - Lets you capture a screenshot for a manual step.
 - Supports screenshot redaction, cropping, annotations, and screenshot replacement before export.
 - Collapses long step cards so larger recordings are easier to edit.
-- Exports portable Markdown or HTML guides with relative image links.
+- Exports a portable, offline HTML viewer with embedded screenshots, a step list, zoom, keyboard navigation, fullscreen, and a slideshow.
 
 ## Why It Exists
 
@@ -47,7 +47,7 @@ OpenSteps is especially useful for:
 
 ## Download
 
-Download the latest `OpenSteps-*-win-x64.zip` from [GitHub Releases](https://github.com/b061raporlama-hash/openstep/releases), extract it, and run:
+Download the latest `OpenSteps-*-win-x64.exe` from [GitHub Releases](https://github.com/b061raporlama-hash/openstep/releases) and run it directly. Alternatively, extract the ZIP package and run:
 
 ```text
 OpenSteps.App.exe
@@ -59,25 +59,17 @@ OpenSteps is not code-signed yet. Windows SmartScreen may warn on first launch.
 
 ## Export
 
-OpenSteps exports a portable folder containing the guide file and ordered screenshots:
+While recording, a small island at the top center shows the step count and **Stop Recording**. The bottom control bar stays hidden. Stopping opens the HTML save dialog directly, without opening the editor. Canceling keeps the local session available in **Saved guides**, where you can review, edit, and use **Export guide** later.
+
+Choose where to save the `.html` file. The export contains the viewer, screenshots, styles, and scripts in one file:
 
 ```text
-Exported Guide/
-guide.md
-guide.html
-images/
-step-001.png
-step-002.png
-step-003.png
+My Guide.html
 ```
 
-Markdown and HTML exports use relative links such as:
+Open the file directly in Edge or Chrome. Use the thumbnail list, Previous/Next buttons, or arrow keys to navigate; Home/End jump to the first/last step. The viewer includes zoom, fit-to-screen, fullscreen, and a manually advanced slideshow. Its controls are in Turkish.
 
-```markdown
-![Step 1](images/step-001.png)
-```
-
-The exported guide does not link back to `%LOCALAPPDATA%`, so you can move or share the export folder as a self-contained guide.
+The file works without an internet connection, an accompanying images folder, or access to `%LOCALAPPDATA%`. Edited screenshots are embedded without re-encoding. Steps without screenshots remain visible with a placeholder; missing image files are reported in the export result.
 
 ## Privacy
 

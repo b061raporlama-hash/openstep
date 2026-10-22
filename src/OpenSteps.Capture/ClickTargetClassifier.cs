@@ -20,7 +20,8 @@ public sealed class ClickTargetClassifier
         "TrayDummySearchControl",
         "Windows.UI.Input.InputSite.WindowClass",
         "Start",
-        "NotifyIconOverflowWindow"
+        "NotifyIconOverflowWindow",
+        "TopLevelWindowForOverflowXamlIsland"
     };
 
     private static readonly HashSet<string> DesktopClassNames = new(StringComparer.OrdinalIgnoreCase)

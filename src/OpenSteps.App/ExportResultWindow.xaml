@@ -58,7 +58,7 @@
                     </Border>
                     <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
                         <TextBlock Text="Export complete" Style="{StaticResource DisplayText}" FontSize="20" />
-                        <TextBlock Text="Your guide files are ready."
+                        <TextBlock Text="Your HTML guide is ready."
                                    Style="{StaticResource SubtleText}"
                                    Margin="0,2,0,0" />
                     </StackPanel>
@@ -73,7 +73,7 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel Grid.Row="0">
-                    <TextBlock Text="CREATED FILES" Style="{StaticResource CaptionText}" Margin="0,0,0,6" />
+                    <TextBlock Text="CREATED FILE" Style="{StaticResource CaptionText}" Margin="0,0,0,6" />
                     <Border Background="{StaticResource SubtleSurfaceBrush}"
                             BorderBrush="{StaticResource BorderSoftBrush}"
                             BorderThickness="1"
