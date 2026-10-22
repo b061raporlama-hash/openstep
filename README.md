@@ -1,139 +1,116 @@
 # OpenSteps
 
-> [!WARNING]
-> OpenSteps is an early Windows beta. It is usable for local workflow capture, but you should review every screenshot before sharing or exporting a guide.
+**Windows'taki işlemlerinizi kaydedin, adımları düzenleyin, tek bir HTML dosyasıyla paylaşın.**
 
-<p align="center"><strong>A Windows-native recorder for turning desktop workflows into clean step-by-step guides.</strong></p>
+OpenSteps, masaüstünde yaptığınız işlemleri ekran görüntüleri ve tıklama bilgileriyle adım adım rehbere dönüştüren, yerel çalışan açık kaynaklı bir Windows uygulamasıdır. Destek dokümanları, kurum içi işlem talimatları, eğitim içerikleri ve hata bildirimleri hazırlamak için geliştirilir.
 
-OpenSteps records what you do on Windows, captures screenshots and click context, then turns the result into an editable guide you can export as a single interactive HTML file. It is built for support docs, onboarding notes, internal SOPs, QA repro steps, and tutorials where you want a local tool instead of a cloud recorder.
+Kaydı durdurduğunuzda rehberi doğrudan HTML olarak kaydedebilirsiniz. Ekran görüntüleri ve görüntüleyici aynı dosyanın içindedir; alıcı dosyayı Edge veya Chrome ile internet bağlantısı olmadan açabilir.
 
-<p align="center">
-  <img src="img/initial.png" alt="OpenSteps before recording" width="720" />
-  <br />
-  <em>OpenSteps before recording</em>
-</p>
+[**Windows için indir**](https://github.com/b061raporlama-hash/openstep/releases/latest) · [Sürüm notları](docs/releases/v0.3.0.md) · [Hata bildir](https://github.com/b061raporlama-hash/openstep/issues)
 
 <p align="center">
-  <img src="img/guide.png" alt="OpenSteps guide editor" width="720" />
+  <img src="img/current/html-viewer.png" alt="OpenSteps HTML çıktısı: solda adım listesi, ortada ekran görüntüsü, altta açıklama ve gezinme düğmeleri" width="1000" />
   <br />
-  <em>Editing a captured guide</em>
+  <em>v0.3.0 HTML görüntüleyicisi — Not Defteri üzerinde hazırlanmış örnek rehber.</em>
 </p>
 
-## What It Does
+> [!NOTE]
+> OpenSteps geliştirme aşamasında bir Windows beta uygulamasıdır. Masaüstü arayüzü İngilizce, dışa aktarılan HTML rehberinin kontrolleri Türkçedir. Paylaşmadan önce ekran görüntülerini ve açıklamaları gözden geçirin.
 
-- Records desktop workflows with global click, right-click, and double-click capture.
-- Captures screenshots, click highlights, active-window metadata, and UI Automation context.
-- Supports full-desktop screenshots or active-window-only screenshots.
-- Skips OpenSteps UI, taskbar, and system-tray clicks so recordings stay focused on the real workflow.
-- Saves recordings locally as editable sessions.
-- Lets you rename guides, edit step titles and descriptions, reorder steps, delete steps, and insert manual steps.
-- Lets you capture a screenshot for a manual step.
-- Supports screenshot redaction, cropping, annotations, and screenshot replacement before export.
-- Collapses long step cards so larger recordings are easier to edit.
-- Exports a portable, offline HTML viewer with embedded screenshots, a step list, zoom, keyboard navigation, fullscreen, and a slideshow.
+## İndir ve çalıştır
 
-## Why It Exists
+1. [Son sürümün](https://github.com/b061raporlama-hash/openstep/releases/latest) **Assets** bölümünden `OpenSteps-…-win-x64.exe` dosyasını indirin.
+2. İndirdiğiniz dosyayı çalıştırın. Uygulama taşınabilirdir; kurulum yapmaz ve Başlat menüsüne kısayol eklemez.
+3. Alternatif olarak ZIP paketini çıkarıp içindeki `OpenSteps.App.exe` dosyasını çalıştırın.
 
-Windows Steps Recorder was useful, but it is dated and limited. OpenSteps is a modern local-first replacement for people who need to document Windows workflows quickly without uploading screenshots, installing a browser extension, or using a SaaS account.
+**Gereksinim:** Windows 10 veya üzeri, x64. Yayınlanan paket .NET çalışma zamanını içerir; ayrıca .NET kurmanız gerekmez. Uygulama henüz kod imzalı olmadığı için Windows SmartScreen ilk açılışta uyarı gösterebilir. Sürümlerdeki `.sha256` dosyaları indirmelerin sağlama toplamlarını içerir.
 
-OpenSteps is especially useful for:
+## Nasıl kullanılır?
 
-- IT support guides.
-- Internal process documentation.
-- QA reproduction steps.
-- Customer support walkthroughs.
-- Training and onboarding material.
-- Personal notes for repeated desktop tasks.
+### 1. İş akışını kaydedin
 
-## Download
+Kayıt çubuğundaki **Capture** alanından tüm masaüstünü (**Full Desktop**) veya etkin pencereyi (**Active Window**) seçin. **Start recording** ile kaydı başlatın ve belgelemek istediğiniz işlemleri yapın.
 
-Download the latest `OpenSteps-*-win-x64.exe` from [GitHub Releases](https://github.com/b061raporlama-hash/openstep/releases) and run it directly. Alternatively, extract the ZIP package and run:
+<p align="center">
+  <img src="img/current/recorder.jpg" alt="OpenSteps kayıt çubuğu: yakalama modu, kaydı başlatma ve kaydedilmiş rehberlere erişim" width="780" />
+  <br />
+  <em>Kayıt öncesi yüzen kontrol çubuğu.</em>
+</p>
 
-```text
-OpenSteps.App.exe
-```
+Kayıt sırasında alt çubuk gizlenir. Ekranın üst ortasındaki küçük yüzen kontrol, adım sayısını ve **Stop Recording** düğmesini gösterir. Sol tıklama, sağ tıklama ve çift tıklamalar; ekran görüntüsü, tıklama işareti ve uygulamanın sağladığı arayüz bilgileriyle kaydedilir. OpenSteps'in kendi arayüzüne, görev çubuğuna ve sistem tepsisine yapılan tıklamalar filtrelenir.
 
-The Windows x64 release is self-contained, so the .NET runtime does not need to be installed separately.
+### 2. Kaydedin veya düzenleyin
 
-OpenSteps is not code-signed yet. Windows SmartScreen may warn on first launch.
+**Stop Recording** kaydı bitirir ve doğrudan HTML kaydetme penceresini açar. Kaydetme penceresini iptal etseniz de oturum bilgisayarınızda kalır. Düzenlemek için kayıt çubuğundaki **Saved guides** düğmesinden rehberi açın.
 
-## Export
+<p align="center">
+  <img src="img/current/editor.jpg" alt="OpenSteps rehber düzenleyicisi: adım başlıkları, açıklamalar, ekran görüntüleri ve Export guide düğmesi" width="1000" />
+  <br />
+  <em>v0.3.0 düzenleyicisi — örnek ekran görüntüsü ve elle eklenen adımlarla hazırlanmış rehber.</em>
+</p>
 
-While recording, a small island at the top center shows the step count and **Stop Recording**. The bottom control bar stays hidden. Stopping opens the HTML save dialog directly, without opening the editor. Canceling keeps the local session available in **Saved guides**, where you can review, edit, and use **Export guide** later.
+Düzenleyicide şunları yapabilirsiniz:
 
-Choose where to save the `.html` file. The export contains the viewer, screenshots, styles, and scripts in one file:
+- Rehberin ve adımların başlıklarını, adım açıklamalarını değiştirin.
+- Adımları yeniden sıralayın, silin veya elle yeni adım ekleyin.
+- Ekran görüntülerini kırpın ve hassas alanları gizleyin.
+- Dikdörtgen, ok, yarı saydam vurgu ve sıralı sayı/harf işaretleri ekleyin.
+- Yanlış yakalanan bir görüntüyü dosyadan içe aktararak veya panodan yapıştırarak değiştirin.
 
-```text
-My Guide.html
-```
+Görsel düzenlemeleri yeni bir PNG kopyasına işlenir; ilk yakalanan ekran görüntüsünün üzerine yazılmaz. Düzenlenmiş rehberi **Export guide** ile tekrar HTML olarak kaydedebilirsiniz.
 
-Open the file directly in Edge or Chrome. Use the thumbnail list, Previous/Next buttons, or arrow keys to navigate; Home/End jump to the first/last step. The viewer includes zoom, fit-to-screen, fullscreen, and a manually advanced slideshow. Its controls are in Turkish.
+### 3. Tek dosyayla paylaşın
 
-The file works without an internet connection, an accompanying images folder, or access to `%LOCALAPPDATA%`. Edited screenshots are embedded without re-encoding. Steps without screenshots remain visible with a placeholder; missing image files are reported in the export result.
+Kaydettiğiniz `.html` dosyası ekran görüntülerini, açıklamaları ve görüntüleyiciyi birlikte içerir. Ayrı bir görsel klasörü veya OpenSteps kurulumu gerektirmez.
 
-## Privacy
+| HTML görüntüleyicisinde | Kullanım |
+| --- | --- |
+| Adım listesi ve küçük önizlemeler | İstediğiniz adıma doğrudan geçin; listeyi gizleyip açın. |
+| Önceki / Sonraki | Düğmelerle veya klavyenin `←` / `→` tuşlarıyla ilerleyin. |
+| İlk / son adım | `Home` / `End` tuşlarını kullanın. |
+| Yakınlaştırma ve sığdırma | Görüntünün ayrıntılarını inceleyin, ardından ekrana sığdırın. |
+| Tam ekran ve slayt gösterisi | Rehberi sunum şeklinde, adımları elle ilerleterek gösterin. |
 
-OpenSteps runs locally. It does not require an account, does not upload screenshots, and does not include telemetry.
+## Yerel kayıt ve gizlilik
 
-Recordings are saved under:
+OpenSteps hesap gerektirmez, ekran görüntülerini sunucuya yüklemez ve telemetri içermez. Oturumlar şu klasörde tutulur:
 
 ```text
 %LOCALAPPDATA%\OpenSteps\Sessions
 ```
 
-Each saved session contains a `session.json` file and local screenshots. You can reopen, rename, edit, delete, and export sessions again.
+Her oturumda bir `session.json` dosyası ve ekran görüntüleri bulunur. **Saved guides** üzerinden oturumları yeniden açabilir, düzenleyebilir, silebilir ve tekrar dışa aktarabilirsiniz.
 
-Screenshot modes affect how much screen content is captured:
+Etkin pencere yakalanamazsa uygulama tüm masaüstü görüntüsüne geri dönebilir. Ekran görüntüleri ve pencere/arayüz bilgileri özel veriler içerebilir; paylaşacağınız rehberi kontrol edin ve gerektiğinde kırpma veya gizleme araçlarını kullanın.
 
-- **Full desktop** captures all visible monitors.
-- **Active window only** captures the foreground window when possible.
+Yazı yazma eylemi algılanır, ancak yazılan karakterler saklanmaz. `Enter`, `Tab` ve `Ctrl+S` gibi tuşlar veya kısayollar adım olarak kaydedilebilir. Yazdığınız metin yine de ekran görüntüsünde görünebilir.
 
-If active-window capture fails, OpenSteps falls back to full-desktop capture so the step is not lost. Screenshots can still contain private data, so review every step before sharing a guide. Use crop and redaction to remove irrelevant or sensitive areas.
+## Bilinen sınırlar
 
-The guide editor can import or paste a replacement screenshot when active-window capture grabs the wrong image. Screenshot annotations include rectangles, arrows, semi-transparent highlights, and sequential number or letter markers. Annotation edits are baked into a new PNG copy in the session images folder, so the original captured screenshot is not overwritten.
+- Yönetici olarak çalışan uygulamalar, OpenSteps aynı yetkiyle çalışmıyorsa yakalama veya arayüz bilgilerine erişimi engelleyebilir.
+- Bazı uygulamalar yeterli arayüz bilgisi sağlamaz; otomatik adım başlıklarını düzenlemek gerekebilir.
+- Etkin pencerenin sınırları, tam ekran uygulamalar ve korumalı içerik ekran yakalamayı etkileyebilir.
+- Masaüstü uygulamasının mevcut dışa aktarma akışı tek dosyalık HTML üretir.
 
-OpenSteps detects that typing happened, but it does not store typed characters by default. Safe keys such as `Enter`, `Tab`, and shortcuts like `Ctrl+S` may be recorded as documentation steps. Password and secure fields are treated cautiously.
+## Kaynaktan derleme
 
-## Build From Source
-
-Requirements:
-
-- Windows 10 or newer.
-- .NET 8 SDK with Windows Desktop runtime.
-
-Build and run:
+Windows üzerinde **.NET 8 SDK** gereklidir. Proje C# ve WPF ile geliştirilir.
 
 ```powershell
 dotnet build OpenSteps.sln
 dotnet run --project src\OpenSteps.App\OpenSteps.App.csproj
 ```
 
-Run tests:
+Testleri çalıştırmak için:
 
 ```powershell
 dotnet test OpenSteps.sln
 ```
 
-## Known Limits
+Depoda `OpenSteps.App` masaüstü arayüzünü, `OpenSteps.Capture` Windows yakalama katmanını, `OpenSteps.Core` oturum ve dışa aktarma işlemlerini içerir. Katkı yapmadan önce [AGENTS.md](AGENTS.md) kurallarını ve arayüz/yakalama değişiklikleri için [elle doğrulama adımlarını](docs/manual-smoke-test.md) inceleyin.
 
-- Elevated/admin apps may block hooks, screenshots, or metadata unless OpenSteps is also elevated.
-- Some apps expose little or no UI Automation metadata; screenshots and click coordinates should still work.
-- Active-window capture depends on Windows reporting usable window bounds.
-- Full-screen apps and protected content may interfere with screenshot capture.
-- Active-window capture may fall back to full-desktop capture when a window cannot be captured safely.
-- The app is Windows-first and currently targets local desktop workflows only.
+## Projenin kökeni ve lisans
 
-## Roadmap
+Bu depo, [ebanez8/openstep](https://github.com/ebanez8/openstep) projesinden çatallanmıştır. Bu çatalla geliştirilen tek dosyalık etkileşimli HTML rehberi, Türkçe görüntüleyici kontrolleri ve yüzen kayıt kontrolü mevcut sürümün odağını oluşturur. Yukarıdaki ekran görüntüleri bu deponun v0.3.0 sürümünden alınmıştır; örnek rehber tanıtım amacıyla hazırlanmıştır.
 
-- More reliable capture around unusual shell surfaces.
-- Better generated titles from UI Automation metadata.
-- More editor polish for long guides.
-- Richer HTML export styling.
-
-## Contributing
-
-See [AGENTS.md](AGENTS.md) for repository guidelines. Keep changes focused, add tests for core behavior, and include manual verification notes for capture or WPF UI changes.
-
-## License
-
-MIT. See [LICENSE](LICENSE).
+MIT lisansı ile dağıtılır. Kaynak projenin ve katkı sahiplerinin lisans bildirimi [LICENSE](LICENSE) dosyasında korunur.
